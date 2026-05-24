@@ -331,11 +331,18 @@ macOS notifications here.
 
 ### Read Layer
 
-**Accessibility API** (`pyobjc-framework-ApplicationServices`).
-- If LINE is not the frontmost app: navigate LINE's sidebar to the target chat,
-  read the message list, then leave it there (no restore).
-- If LINE is frontmost (user is actively using it): skip navigation, use the
-  notification preview only.
+**Message text → screenshot + Vision OCR** (`accessibility_reader.py`). The text
+is **not** in the Accessibility tree: walking LINE's AX tree (2026-05-25) returned
+491 nodes with **zero `AXStaticText`** — the message area is just empty
+`AXRow`/`AXCell` shells. LINE is Qt 6 / Qt Quick (QML) and draws message bubbles
+via Skia as pixels; Qt Quick only exposes accessible text if the developer adds
+`Accessible` attributes per item, which LINE doesn't. So pixels → Vision OCR is
+the only way to get the content.
+
+**Chat name → Accessibility API** (`pyobjc-framework-ApplicationServices`). The
+native macOS menu bar *is* accessible, so `get_current_chat_name()` reads the
+current chat title from the Window menu's first item. (AX for what's exposed,
+OCR for what isn't.)
 
 ### State Layer
 
