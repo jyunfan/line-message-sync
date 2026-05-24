@@ -64,7 +64,7 @@ def make_on_db_change(telegram: TelegramSender):
     def handler():
         with _lock:
             now = time.time()
-            if now - _last_fire[0] < 1.5:
+            if now - _last_fire[0] < 4.0:
                 return
             _last_fire[0] = now
 

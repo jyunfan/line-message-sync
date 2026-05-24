@@ -32,7 +32,10 @@ def set_topic(chat_name: str, topic_id: int):
 
 
 def is_seen(chat_name: str, sender: str, text: str) -> bool:
-    key = hashlib.sha1(f"{chat_name}\x00{sender}\x00{text}".encode()).hexdigest()
+    # Hash on text only (sender parsing is unreliable across OCR runs).
+    # Normalize before hashing so minor OCR variations don't break dedup.
+    from accessibility_reader import normalize_for_dedup
+    key = hashlib.sha1(f"{chat_name}\x00{normalize_for_dedup(text)}".encode()).hexdigest()
     data = _load()
     seen_set = set(data["seen"].get(chat_name, []))
     if key in seen_set:
