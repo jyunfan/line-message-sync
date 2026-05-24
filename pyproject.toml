@@ -1,0 +1,12 @@
+[project]
+name = "line-sync"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.13"
+dependencies = [
+    "httpx>=0.28.1",
+    "pyobjc-framework-applicationservices>=12.1",
+    "pyobjc-framework-cocoa>=12.1",
+    "pyobjc-framework-vision>=12.1",
+    "watchdog>=6.0.0",
+]

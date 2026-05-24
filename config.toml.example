@@ -1,0 +1,2 @@
+bot_token          = "YOUR_BOT_TOKEN"
+supergroup_chat_id = -1001234567890   # must be a supergroup with Topics enabled
