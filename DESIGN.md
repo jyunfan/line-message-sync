@@ -294,6 +294,98 @@ In **`/tmp/line-inject/`** (EPHEMERAL — gone on reboot; rebuild from this doc)
 
 ---
 
+## Plan B (different platform): Windows route
+
+**Status (2026-05-25): documented alternative, NOT pursued.** Requires running
+LINE on Windows (physical box or VM) — a different environment from this Mac.
+Listed because it's substantially easier *and lower-risk* than Plan A if a
+Windows host is acceptable.
+
+### Why Windows is easier
+
+Windows has **no SIP / hardened-runtime equivalent**. A process running as the
+same user can `OpenProcess` + `ReadProcessMemory` on LINE **without injecting or
+modifying anything**. The two macOS walls (no memory read via `task_for_pid`, no
+injection) simply don't exist. So the key can be *read out of LINE's RAM*, not
+prised out via a dylib hijack.
+
+### Mechanism (per published forensics, see source)
+
+- Windows LINE encrypts its chat DB with **wxSQLite3** (AES-128/256-CBC, per
+  page) — **not** the Mac's custom Yuki codec. wxSQLite3's container format is
+  public, so decryption is straightforward once the key is known.
+- The DB key is a **32-char hex passphrase**, fetched from the server at login
+  and **resident in process memory until logout**.
+- Recovery: scan LINE's process memory for the passphrase (`OpenProcess` +
+  `ReadProcessMemory`, same-user; or a RAM capture), then decrypt the DB offline
+  with wxSQLite3 / SQLite3MultipleCiphers.
+
+### Risk / cost vs Plan A
+
+- **Lower account risk**: read-only memory access — LINE's binary and runtime are
+  untouched, so far less tamper surface than the Mac dylib hijack.
+- **Standard DB format**: wxSQLite3 is documented; no need to reverse a custom codec.
+- **Caveats**: (1) needs a Windows host running this LINE account; (2) on-screen
+  text via UI Automation is likely the *same* dead end as macOS AX — LINE desktop
+  appears to share the Qt (`line-qt-desktop`) codebase that draws messages via
+  Skia, so UIA probably won't expose message text either (framework not 100%
+  confirmed); (3) passphrase is only present while LINE is logged in; assumed
+  stable across logins but unverified.
+
+Source: *Forensic Analysis of wxSQLite3-Encrypted Databases and Its Application*,
+MDPI Electronics 13(7):1325, 2024 — https://www.mdpi.com/2079-9292/13/7/1325
+
+---
+
+## Reverse direction: Telegram → LINE (send-back)
+
+**Status (2026-05-25): documented, not implemented.** Sending a message *from*
+Telegram *into* a LINE chat (as the user) is feasible, and is actually the
+**easiest, lowest-risk** piece — but only via UI automation, not any API.
+
+### Official APIs can't do it
+
+- **LINE Notify**: terminated 2025-03-31 — gone.
+- **Messaging API**: only sends *from a LINE Official Account*, to users/groups
+  that added the OA. It **cannot send as your personal account** into your
+  existing personal chats/groups. No official personal-send path exists.
+
+### Only viable path: UI automation (drive the real client)
+
+Flow: Telegram bot receives a message → script focuses the target LINE chat →
+pastes text into the compose box → presses Enter.
+
+- **Why it's easier than *reading***: the compose box is a real, focusable text
+  field (the AX walk found `AXTextField` + `AXTextArea` — the only text nodes in
+  the window). Sending = *synthesize input*, which is unaffected by the Skia-drawn
+  message area that defeats reading. Writing is easy precisely where reading isn't.
+- **macOS**: Accessibility API (`AXUIElementSetAttributeValue` on the field) +
+  CGEvent for Enter, or pasteboard + ⌘V. **Works on this Mac — no Windows needed.**
+- **Windows**: `pywinauto` / `uiautomation` (UIA) / `SendInput`. No special
+  advantage over macOS here (the Windows edge was for *reading* the DB, not sending).
+
+### Hard part (same on both platforms): selecting the right chat
+
+The sidebar/chat list exposes no AX/UIA text (same Qt/Skia limitation), so you
+can't reliably click a chat by name. Pragmatic approach: drive **LINE's search
+box** — focus it, type the chat/contact name, open the top result. The
+Telegram-topic ↔ LINE-chat-name mapping already lives in `state.json` (`topics`),
+so it can supply the name to search for.
+
+### Risk
+
+- **Low ban risk**: drives the real client as if the user typed — far safer than
+  reverse-engineered LEGY/protocol clients.
+- **Intrusive**: steals focus and needs LINE visible → best on a dedicated
+  machine/VM.
+- **Mis-navigation = wrong recipient**: confirm the active chat (e.g. window
+  title == target name) *before* sending.
+
+Sources: [LINE Notify terminated 2025-03-31](https://developers.line.biz/en/news/2025/04/01/line-notify/) ·
+[Messaging API group chats](https://developers.line.biz/en/docs/messaging-api/group-chats/)
+
+---
+
 ## Decisions
 
 | # | Question | Decision |
